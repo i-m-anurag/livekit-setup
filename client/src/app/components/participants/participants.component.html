@@ -1,0 +1,19 @@
+<div class="participants-panel">
+  <h3>Participants ({{ participants.length }})</h3>
+  <ul class="participant-list">
+    @for (p of participants; track p.identity) {
+      <li class="participant-item" [class.agent]="isAgent(p)">
+        <span class="indicator" [class.agent-indicator]="isAgent(p)"></span>
+        <span class="name">
+          {{ p.name || p.identity }}
+          @if (isAgent(p)) {
+            <span class="badge agent-badge">AI</span>
+          }
+          @if (p === participants[0]) {
+            <span class="badge you-badge">You</span>
+          }
+        </span>
+      </li>
+    }
+  </ul>
+</div>

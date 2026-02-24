@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  livekit-server:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      - "7880:7880/tcp"   # WebSocket signaling
+      - "7881:7881/tcp"   # ICE over TCP
+      # No UDP ports - TCP only for corporate VPN compatibility
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    networks:
+      - livekit-network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - livekit-network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+
+networks:
+  livekit-network:
+    driver: bridge

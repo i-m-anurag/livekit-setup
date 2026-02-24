@@ -1,0 +1,39 @@
+# =============================================================================
+# LiveKit SFU — ICE over TCP Only
+# =============================================================================
+#
+# Single container. Two TCP ports. Zero UDP. No TURN. No TLS certs.
+#
+#   7880/tcp — Signaling (WebSocket) — proxy behind Nginx for wss://
+#   7881/tcp — Media (ICE/TCP)       — expose directly, NOT behind proxy
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#
+# =============================================================================
+
+services:
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      - "7880:7880/tcp"   # Signaling (WebSocket)
+      - "7881:7881/tcp"   # ICE/TCP media — direct, no reverse proxy
+      # NO UDP ports
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

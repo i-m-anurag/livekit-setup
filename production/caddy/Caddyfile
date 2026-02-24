@@ -1,0 +1,82 @@
+# =============================================================================
+# Caddy - Production Reverse Proxy with Auto TLS
+# Handles HTTPS termination for LiveKit signaling + Express API + Angular SPA
+# =============================================================================
+
+# Global settings
+{
+	# Email for Let's Encrypt certificate registration
+	email {$CADDY_ACME_EMAIL:admin@example.com}
+
+	# Use Let's Encrypt production CA
+	# Uncomment the line below for testing to avoid rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# ---------------------------------------------------------------------------
+# Main Application Domain
+# Serves Angular frontend + proxies API requests to Express backend
+# ---------------------------------------------------------------------------
+{$APP_DOMAIN:app.example.com} {
+	# Angular SPA (frontend via nginx)
+	reverse_proxy /api/* express-backend:3000
+
+	# WebSocket support for any future real-time features on Express
+	reverse_proxy /socket.io/* express-backend:3000 {
+		header_up Connection {>Connection}
+		header_up Upgrade {>Upgrade}
+	}
+
+	# Everything else goes to Angular (served by nginx)
+	reverse_proxy angular-frontend:80
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
+
+	# Logging
+	log {
+		output stdout
+		format console
+	}
+}
+
+# ---------------------------------------------------------------------------
+# LiveKit Signaling Domain
+# Proxies WebSocket connections to LiveKit server
+# ---------------------------------------------------------------------------
+{$LIVEKIT_DOMAIN:livekit.example.com} {
+	reverse_proxy livekit-server:7880 {
+		# WebSocket upgrade support - required for LiveKit signaling
+		header_up Connection {>Connection}
+		header_up Upgrade {>Upgrade}
+	}
+
+	# Security headers
+	header {
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# ---------------------------------------------------------------------------
+# TURN Domain - TLS Certificate Only
+# Caddy just provisions the cert; LiveKit handles TURN traffic directly
+# TURN/TLS runs on the LiveKit container itself (port 443 mapped directly)
+# ---------------------------------------------------------------------------
+# NOTE: The TURN domain certificate is handled separately.
+# Caddy provisions certs for app + livekit domains.
+# For the TURN domain, use certbot or mount certs manually.
+# See: production/ssl/README for cert provisioning instructions.

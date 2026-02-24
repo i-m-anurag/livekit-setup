@@ -1,0 +1,200 @@
+.room-page {
+  min-height: 100vh;
+  background: #1a1a2e;
+}
+
+// Join Form
+.join-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.join-card {
+  background: #16213e;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  h1 {
+    color: #e94560;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+
+  .subtitle {
+    color: #a0a0b0;
+    text-align: center;
+    margin: 0 0 24px;
+    font-size: 14px;
+  }
+}
+
+.form-group {
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    color: #c0c0d0;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px 14px;
+    background: #0f3460;
+    border: 1px solid #533483;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+
+    &:focus {
+      border-color: #e94560;
+    }
+
+    &::placeholder {
+      color: #666;
+    }
+  }
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #d63851;
+  }
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: #a0a0b0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  font-size: 13px;
+
+  &:hover {
+    color: #e94560;
+    border-color: #e94560;
+  }
+}
+
+.error-message {
+  background: rgba(233, 69, 96, 0.15);
+  border: 1px solid #e94560;
+  color: #e94560;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+// Room View
+.room-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #16213e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  .room-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h2 {
+      color: #fff;
+      margin: 0;
+      font-size: 18px;
+    }
+  }
+
+  .connection-status {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+
+    &.connected {
+      background: rgba(76, 175, 80, 0.2);
+      color: #4caf50;
+    }
+
+    &.reconnecting {
+      background: rgba(255, 152, 0, 0.2);
+      color: #ff9800;
+    }
+
+    &.disconnected {
+      background: rgba(233, 69, 96, 0.2);
+      color: #e94560;
+    }
+  }
+}
+
+.btn-leave {
+  padding: 8px 16px;
+  background: transparent;
+  color: #e94560;
+  border: 1px solid #e94560;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover {
+    background: rgba(233, 69, 96, 0.1);
+  }
+}
+
+.room-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+
+  app-participants {
+    width: 240px;
+    flex-shrink: 0;
+    padding: 12px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  app-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+  }
+}

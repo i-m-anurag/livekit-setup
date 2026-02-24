@@ -1,0 +1,71 @@
+# =============================================================================
+# LiveKit - TURN-Only Server Configuration
+# No SFU / No media routing — purely a TURN relay for NAT/firewall traversal
+# =============================================================================
+#
+# What this does:
+#   - Runs LiveKit's built-in TURN server ONLY
+#   - Relays TCP/TLS traffic for WebRTC clients stuck behind firewalls
+#   - No rooms, no signaling, no media processing
+#
+# Use case:
+#   - Your SFU (LiveKit or other) runs elsewhere
+#   - Clients on restrictive networks relay through this TURN server
+#   - Corporate VPNs that block UDP and non-443 TCP ports
+#
+# =============================================================================
+
+port: 7880
+bind: 0.0.0.0
+log_level: info
+
+# -----------------------------------------------------------------------------
+# RTC - Disabled (no SFU functionality needed)
+# -----------------------------------------------------------------------------
+rtc:
+  tcp_port: 0
+  port_range_start: 50000
+  port_range_end: 50000
+  use_external_ip: false
+
+# -----------------------------------------------------------------------------
+# TURN Server — The only thing that matters in this config
+# -----------------------------------------------------------------------------
+#
+# IMPORTANT: TURN/TLS is NOT HTTP. It is raw TLS + STUN/TURN binary protocol.
+# A regular Nginx reverse proxy (proxy_pass) CANNOT handle TURN traffic.
+#
+# You have two options when Nginx already runs on port 443:
+#
+#   Option A: Nginx stream (L4 passthrough) — recommended
+#     - TURN listens on 5349 inside container
+#     - Nginx stream block forwards raw TCP from host:443 → container:5349
+#     - Clients connect to turns:turn.example.com:443 (max firewall compat)
+#     - See nginx-stream.conf in this folder
+#
+#   Option B: Direct port — simpler, but clients must reach port 5349
+#     - TURN listens on 5349, exposed directly on host:5349
+#     - No Nginx involvement
+#     - Clients connect to turns:turn.example.com:5349
+#     - Some strict firewalls may block 5349
+#
+# -----------------------------------------------------------------------------
+turn:
+  enabled: true
+
+  # MUST match your TLS certificate CN/SAN
+  domain: turn.example.com
+
+  # Container-internal port (Nginx or host maps external port to this)
+  tls_port: 5349
+
+  # TLS certificates
+  cert_file: /etc/ssl/turn/fullchain.pem
+  key_file: /etc/ssl/turn/privkey.pem
+
+# -----------------------------------------------------------------------------
+# API Keys — required for LiveKit process to start
+# Generate: openssl rand -hex 16 (key), openssl rand -hex 32 (secret)
+# -----------------------------------------------------------------------------
+keys:
+  APIKeyChangeMe: APISecretChangeMe

@@ -1,0 +1,113 @@
+# =============================================================================
+# LiveKit Server - PRODUCTION Configuration
+# ICE over TCP + TURN/TLS for Corporate VPN / Firewall Environments
+# =============================================================================
+
+# WebSocket signaling port (behind Caddy reverse proxy at :443)
+port: 7880
+bind: 0.0.0.0
+log_level: info
+
+# -----------------------------------------------------------------------------
+# RTC Configuration - TCP ONLY (No UDP)
+# -----------------------------------------------------------------------------
+rtc:
+  # ICE over TCP port - direct TCP media transport
+  # This port MUST be exposed directly (NOT behind TLS termination or L7 LB)
+  tcp_port: 7881
+
+  # Disable UDP port range entirely
+  port_range_start: 50000
+  port_range_end: 50000
+
+  # CRITICAL: Must be true in cloud/VPS environments for correct ICE candidates
+  use_external_ip: true
+
+  # Allow TCP fallback when UDP fails (belt-and-suspenders)
+  allow_tcp_fallback: true
+
+  # STUN servers for external IP discovery
+  stun_servers:
+    - stun.l.google.com:19302
+    - stun1.l.google.com:19302
+
+  # Limit ICE candidate types for faster connection in TCP-only mode
+  # Uncomment if you want to skip host candidates and go straight to relay:
+  # enable_loopback_candidate: false
+
+# -----------------------------------------------------------------------------
+# TURN Server Configuration - TLS on port 443
+# Makes WebRTC traffic look like HTTPS to firewalls
+# -----------------------------------------------------------------------------
+turn:
+  enabled: true
+  # MUST match the TLS certificate domain
+  domain: turn.example.com
+  # Port 5349 for TURN/TLS (443 is used by Caddy reverse proxy)
+  # If Caddy is NOT used, change this to 443 for maximum firewall compat
+  tls_port: 5349
+  # TURN over UDP (optional backup, comment out for pure TCP)
+  # udp_port: 3478
+  # TLS certificate paths (mounted into container)
+  cert_file: /etc/ssl/turn/fullchain.pem
+  key_file: /etc/ssl/turn/privkey.pem
+
+# -----------------------------------------------------------------------------
+# API Keys - CHANGE THESE IN PRODUCTION
+# Generate with: openssl rand -hex 32
+# -----------------------------------------------------------------------------
+keys:
+  # Format: api_key: api_secret
+  # Use strong random values, NOT these defaults
+  APIKeyChangeMe: SecretChangeMe_Generate_With_openssl_rand_hex_32
+
+# -----------------------------------------------------------------------------
+# Redis Configuration - Required for multi-node deployments
+# Enables room state sharing across LiveKit instances
+# -----------------------------------------------------------------------------
+redis:
+  address: redis:6379
+  # Uncomment and set if Redis requires authentication:
+  # password: your-redis-password
+  # db: 0
+
+# -----------------------------------------------------------------------------
+# Room Defaults
+# -----------------------------------------------------------------------------
+room:
+  # Empty room timeout (seconds) - clean up rooms with no participants
+  empty_timeout: 300
+  # Max participants per room
+  max_participants: 50
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  # Structured JSON logging for production log aggregation
+  json: true
+  # Sample rate for pion (WebRTC internals) - reduce noise
+  # pion_level: warn
+
+# -----------------------------------------------------------------------------
+# Webhook Configuration (optional)
+# Notifies your backend of room/participant events
+# -----------------------------------------------------------------------------
+# webhook:
+#   urls:
+#     - https://app.example.com/api/livekit/webhook
+#   api_key: APIKeyChangeMe
+
+# -----------------------------------------------------------------------------
+# Region Configuration (optional, for geo-distributed deployments)
+# -----------------------------------------------------------------------------
+# region: us-west-2
+
+# -----------------------------------------------------------------------------
+# Limits
+# -----------------------------------------------------------------------------
+limit:
+  # Max number of tracks per participant
+  num_tracks: 20
+  # Max bitrate per participant (bytes/sec) - 10 Mbps
+  bytes_per_sec: 10000000

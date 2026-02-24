@@ -1,0 +1,260 @@
+# =============================================================================
+# Production Docker Compose - LiveKit MEAN Stack (ICE over TCP)
+# =============================================================================
+#
+# Services:
+#   1. caddy            - Reverse proxy + auto TLS (HTTPS)
+#   2. livekit-server   - WebRTC SFU (signaling + ICE/TCP + TURN/TLS)
+#   3. redis            - LiveKit state store (multi-node support)
+#   4. mongodb          - Application database
+#   5. express-backend  - Node.js API + AI Agent
+#   6. angular-frontend - Angular SPA (served by nginx)
+#
+# Ports exposed to host:
+#   80/tcp   - HTTP (Caddy redirects to HTTPS)
+#   443/tcp  - HTTPS (Caddy TLS) + TURN/TLS (LiveKit)
+#   7881/tcp - ICE over TCP (direct, NOT behind proxy)
+#
+# ZERO UDP ports exposed.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Caddy - Reverse Proxy + Auto HTTPS
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"       # HTTP -> HTTPS redirect
+      - "443:443"     # HTTPS for app + LiveKit signaling
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data         # TLS certificates
+      - caddy_config:/config     # Caddy config cache
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-app.example.com}
+      - LIVEKIT_DOMAIN=${LIVEKIT_DOMAIN:-livekit.example.com}
+      - CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL:-admin@example.com}
+    depends_on:
+      express-backend:
+        condition: service_healthy
+      angular-frontend:
+        condition: service_healthy
+      livekit-server:
+        condition: service_started
+    networks:
+      - livekit-prod
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # LiveKit Server - WebRTC SFU
+  # Handles: signaling (7880), ICE/TCP (7881), TURN/TLS (5349)
+  # ---------------------------------------------------------------------------
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      # ICE over TCP - MUST be exposed directly (not behind L7 proxy)
+      - "7881:7881/tcp"
+      # TURN/TLS - direct exposure for corporate firewall traversal
+      # Uses a separate port to avoid conflict with Caddy on 443
+      - "5349:5349/tcp"
+    # NOTE: Port 7880 (signaling) is NOT exposed to host;
+    # Caddy proxies to it internally via Docker network
+    volumes:
+      - ./livekit-production.yaml:/etc/livekit.yaml:ro
+      - ./ssl/turn:/etc/ssl/turn:ro    # TURN TLS certificates
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - livekit-prod
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Redis - LiveKit State Store
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: >
+      redis-server
+        --save 60 1
+        --loglevel warning
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    # No port exposed to host - internal only
+    volumes:
+      - redis_data:/data
+    networks:
+      - livekit-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # MongoDB - Application Database
+  # ---------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    # No port exposed to host - internal only
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme_in_production}
+      MONGO_INITDB_DATABASE: livekit-chat
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - livekit-prod
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Express Backend - API Server + AI Agent
+  # ---------------------------------------------------------------------------
+  express-backend:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: express-backend
+    restart: unless-stopped
+    # No port exposed to host - Caddy proxies to it internally
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-changeme_in_production}@mongodb:27017/livekit-chat?authSource=admin
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-APIKeyChangeMe}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-SecretChangeMe_Generate_With_openssl_rand_hex_32}
+      LIVEKIT_WS_URL: ws://livekit-server:7880
+      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret_in_production}
+      CORS_ORIGIN: https://${APP_DOMAIN:-app.example.com}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      livekit-server:
+        condition: service_started
+    networks:
+      - livekit-prod
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------------------
+  # Angular Frontend - SPA served by Nginx
+  # ---------------------------------------------------------------------------
+  angular-frontend:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
+    container_name: angular-frontend
+    restart: unless-stopped
+    # No port exposed to host - Caddy proxies to it internally
+    networks:
+      - livekit-prod
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  livekit-prod:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

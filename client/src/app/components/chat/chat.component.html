@@ -1,0 +1,32 @@
+<div class="chat-container">
+  <div class="messages-list" #messagesList>
+    @if (messages.length === 0) {
+      <div class="empty-state">
+        <p>No messages yet. Say hello!</p>
+      </div>
+    }
+    @for (msg of messages; track msg.id) {
+      <div
+        class="message"
+        [class.own-message]="msg.isLocal"
+        [class.agent-message]="msg.senderIdentity === 'ai-agent'"
+      >
+        <div class="message-header">
+          <span class="sender">{{ msg.senderName }}</span>
+          <span class="time">{{ msg.timestamp | date:'shortTime' }}</span>
+        </div>
+        <div class="message-body">{{ msg.message }}</div>
+      </div>
+    }
+  </div>
+
+  <div class="message-input">
+    <input
+      type="text"
+      [(ngModel)]="newMessage"
+      (keyup.enter)="sendMessage()"
+      placeholder="Type a message..."
+    />
+    <button (click)="sendMessage()" [disabled]="!newMessage.trim()">Send</button>
+  </div>
+</div>

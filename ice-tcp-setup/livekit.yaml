@@ -1,0 +1,54 @@
+# =============================================================================
+# LiveKit SFU — ICE over TCP Only
+# =============================================================================
+#
+# How it works:
+#   Normal WebRTC sends media as UDP packets on random ports (50000-60000).
+#   Corporate VPNs block UDP → connection fails.
+#
+#   ICE/TCP sends the SAME media over a single TCP connection on port 7881.
+#   VPN allows TCP → connection works.
+#
+#   No TURN server needed. No TLS certs needed. No relay.
+#   Client connects directly to LiveKit on one TCP port.
+#
+# Ports:
+#   7880/tcp — WebSocket signaling (room join, token auth)
+#   7881/tcp — ICE/TCP media (audio, video, data channels)
+#
+# =============================================================================
+
+port: 7880
+bind: 0.0.0.0
+log_level: info
+
+# -----------------------------------------------------------------------------
+# RTC — TCP Only
+# -----------------------------------------------------------------------------
+rtc:
+  # The single TCP port that replaces all UDP media traffic
+  tcp_port: 7881
+
+  # Disable UDP entirely (collapse the range)
+  port_range_start: 50000
+  port_range_end: 50000
+
+  # Private infra — no need to discover public IP via external STUN
+  use_external_ip: false
+
+  # TCP fallback enabled (automatic)
+  allow_tcp_fallback: true
+
+# -----------------------------------------------------------------------------
+# TURN — Disabled (not needed for ICE/TCP)
+# -----------------------------------------------------------------------------
+# turn:
+#   enabled: false
+
+# -----------------------------------------------------------------------------
+# API Keys
+# Generate: openssl rand -hex 16 (key), openssl rand -hex 32 (secret)
+# Must match what your backend uses for livekit-server-sdk token generation
+# -----------------------------------------------------------------------------
+keys:
+  APIKeyChangeMe: APISecretChangeMe

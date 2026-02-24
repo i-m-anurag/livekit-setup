@@ -1,0 +1,56 @@
+# =============================================================================
+# LiveKit TURN-Only Server
+# Single container — relays WebRTC traffic over TLS for firewall traversal
+# =============================================================================
+#
+# Your setup: Nginx reverse proxy owns port 443 on the host.
+# TURN is NOT HTTP — Nginx cannot proxy_pass it (L7 won't work).
+# Pick one option below.
+#
+# =============================================================================
+#
+# Option A (Recommended): Nginx stream (L4 TCP passthrough)
+#   - Container listens on 5349
+#   - Nginx stream block on a SEPARATE server_name forwards 443 → 5349
+#   - Clients see: turns:turn.example.com:443 ← max firewall compatibility
+#   - See nginx-stream.conf for the Nginx config to add
+#
+# Option B (Simpler): Expose 5349 directly, skip Nginx
+#   - Container exposes 5349 on host
+#   - Clients see: turns:turn.example.com:5349
+#   - Some strict firewalls may block non-443 ports
+#
+# =============================================================================
+
+services:
+
+  turn-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-turn
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      # TURN/TLS — container always listens on 5349 internally
+      #
+      # Option A (Nginx stream): expose only to localhost, Nginx forwards to it
+      - "127.0.0.1:5349:5349/tcp"
+      #
+      # Option B (direct): expose to all interfaces, clients hit this port directly
+      # Uncomment below and comment the line above:
+      # - "5349:5349/tcp"
+      #
+      # NO: 443 (Nginx owns it), NO: UDP, NO: signaling
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+      - ./ssl/turn:/etc/ssl/turn:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

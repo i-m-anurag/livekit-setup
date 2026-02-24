@@ -1,0 +1,53 @@
+<div class="room-page">
+  @if (connectionState === 'disconnected') {
+    <!-- Join Room Form -->
+    <div class="join-container">
+      <div class="join-card">
+        <h1>Join a Room</h1>
+        <p class="subtitle">Enter a room name to start chatting with the AI agent</p>
+
+        @if (error) {
+          <div class="error-message">{{ error }}</div>
+        }
+
+        <div class="form-group">
+          <label for="roomName">Room Name</label>
+          <input
+            id="roomName"
+            type="text"
+            [(ngModel)]="roomName"
+            placeholder="e.g. test-room"
+            [disabled]="joining"
+            (keyup.enter)="joinRoom()"
+          />
+        </div>
+
+        <button (click)="joinRoom()" [disabled]="joining || !roomName.trim()" class="btn-primary">
+          {{ joining ? 'Joining...' : 'Join Room' }}
+        </button>
+
+        <button (click)="logout()" class="btn-logout">Logout</button>
+      </div>
+    </div>
+  } @else {
+    <!-- Room View -->
+    <div class="room-container">
+      <header class="room-header">
+        <div class="room-info">
+          <h2>{{ roomName }}</h2>
+          <span class="connection-status" [class]="connectionState">
+            {{ connectionState }}
+          </span>
+        </div>
+        <div class="room-actions">
+          <button (click)="leaveRoom()" class="btn-leave">Leave Room</button>
+        </div>
+      </header>
+
+      <div class="room-body">
+        <app-participants [participants]="participants"></app-participants>
+        <app-chat [messages]="messages" (messageSent)="onSendMessage($event)"></app-chat>
+      </div>
+    </div>
+  }
+</div>

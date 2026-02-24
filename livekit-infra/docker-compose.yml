@@ -1,0 +1,58 @@
+# =============================================================================
+# LiveKit SFU - Production Docker Compose (Standalone, Single-Node)
+# Drop this into any project. Runs LiveKit only — no Redis needed for POC.
+# Your app connects to LiveKit via the exposed ports.
+# =============================================================================
+#
+# Exposed to Host:
+#   7880/tcp  - WebSocket signaling  (proxy with TLS in prod → wss://)
+#   7881/tcp  - ICE over TCP         (direct, no proxy)
+#   5349/tcp  - TURN/TLS             (direct, encrypted relay)
+#
+# ZERO UDP ports.
+#
+# Usage:
+#   cp .env.template .env        # fill in your values
+#   docker compose up -d         # start
+#   docker compose logs -f       # watch logs
+#   docker compose down          # stop
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # LiveKit Server - WebRTC SFU (single container, no dependencies)
+  # ---------------------------------------------------------------------------
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      - "${LIVEKIT_SIGNAL_PORT:-7880}:7880/tcp"    # WebSocket signaling
+      - "${LIVEKIT_ICE_TCP_PORT:-7881}:7881/tcp"   # ICE over TCP
+      - "${LIVEKIT_TURN_TLS_PORT:-5349}:5349/tcp"  # TURN/TLS
+      # *** NO UDP PORTS ***
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+      - ./ssl/turn:/etc/ssl/turn:ro
+    # Resource limits — optional, remove for POC, add for production:
+    # deploy:
+    #   resources:
+    #     limits:          # Max ceiling — killed/throttled if exceeded
+    #       memory: 2G     # OOM-killed above 2GB
+    #       cpus: "2.0"    # Throttled above 2 cores
+    #     reservations:    # Guaranteed minimum — Docker won't go below this
+    #       memory: 256M
+    #       cpus: "0.25"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
