@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiveKit ICE/TCP Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; }
+    .subtitle { color: #8b949e; margin-bottom: 30px; font-size: 0.9rem; }
+
+    /* Join Form */
+    .join-form { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; justify-content: center; }
+    .join-form input { padding: 10px 14px; border-radius: 8px; border: 1px solid #30363d; background: #161b22; color: #e1e4e8; font-size: 0.95rem; width: 200px; }
+    .join-form input:focus { outline: none; border-color: #58a6ff; }
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 0.95rem; cursor: pointer; font-weight: 600; }
+    .btn-connect { background: #238636; color: #fff; }
+    .btn-connect:hover { background: #2ea043; }
+    .btn-disconnect { background: #da3633; color: #fff; }
+    .btn-disconnect:hover { background: #f85149; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Status Panel */
+    .status-panel { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 100%; max-width: 700px; margin-bottom: 20px; }
+    .status-panel h2 { font-size: 1rem; margin-bottom: 12px; color: #8b949e; }
+    .status-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #21262d; }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: #8b949e; }
+    .status-value { font-weight: 600; }
+    .status-value.connected { color: #3fb950; }
+    .status-value.disconnected { color: #f85149; }
+    .status-value.tcp { color: #58a6ff; }
+
+    /* Chat */
+    .chat-panel { background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 700px; display: flex; flex-direction: column; height: 350px; }
+    .chat-panel h2 { font-size: 1rem; color: #8b949e; padding: 16px 20px 12px; border-bottom: 1px solid #21262d; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 12px 20px; display: flex; flex-direction: column; gap: 8px; }
+    .chat-msg { padding: 8px 12px; border-radius: 8px; background: #21262d; max-width: 80%; font-size: 0.9rem; }
+    .chat-msg.self { align-self: flex-end; background: #1f3a5f; }
+    .chat-msg .author { font-size: 0.75rem; color: #8b949e; margin-bottom: 2px; }
+    .chat-msg.system { align-self: center; background: none; color: #8b949e; font-size: 0.8rem; font-style: italic; }
+    .chat-input { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid #21262d; }
+    .chat-input input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: #e1e4e8; font-size: 0.9rem; }
+    .chat-input input:focus { outline: none; border-color: #58a6ff; }
+    .btn-send { background: #58a6ff; color: #0d1117; }
+    .btn-send:hover { background: #79c0ff; }
+
+    /* Participants */
+    .participants { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .participant-badge { background: #21262d; border: 1px solid #30363d; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>LiveKit ICE/TCP Demo</h1>
+  <p class="subtitle">WebRTC media over TCP — zero UDP ports</p>
+
+  <!-- Join -->
+  <div class="join-form">
+    <input type="text" id="roomName" placeholder="Room name" value="test-room" />
+    <input type="text" id="identity" placeholder="Your name" />
+    <button class="btn btn-connect" id="btnConnect" onclick="connect()">Join Room</button>
+    <button class="btn btn-disconnect" id="btnDisconnect" onclick="disconnect()" disabled>Leave</button>
+  </div>
+
+  <!-- Participants -->
+  <div class="participants" id="participants"></div>
+
+  <!-- Status -->
+  <div class="status-panel">
+    <h2>Connection Status</h2>
+    <div class="status-row">
+      <span class="status-label">State</span>
+      <span class="status-value disconnected" id="connState">Disconnected</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Transport</span>
+      <span class="status-value" id="transport">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">ICE Candidate Type</span>
+      <span class="status-value" id="iceType">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Remote Address</span>
+      <span class="status-value" id="remoteAddr">—</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Participants</span>
+      <span class="status-value" id="participantCount">0</span>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-panel">
+    <h2>Chat</h2>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChat()" disabled />
+      <button class="btn btn-send" id="btnSend" onclick="sendChat()" disabled>Send</button>
+    </div>
+  </div>
+
+  <script>
+    const { Room, RoomEvent, ConnectionState } = LivekitClient;
+
+    let room = null;
+    let statsInterval = null;
+
+    async function connect() {
+      const roomName = document.getElementById("roomName").value.trim();
+      const identity = document.getElementById("identity").value.trim();
+
+      if (!roomName || !identity) {
+        alert("Enter both room name and your name");
+        return;
+      }
+
+      document.getElementById("btnConnect").disabled = true;
+
+      // Get token from our server
+      const res = await fetch("/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: roomName, identity }),
+      });
+      const { token } = await res.json();
+
+      // Create room and connect
+      room = new Room();
+
+      // Connection state changes
+      room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        const el = document.getElementById("connState");
+        el.textContent = state;
+        el.className = "status-value " + (state === ConnectionState.Connected ? "connected" : "disconnected");
+
+        if (state === ConnectionState.Connected) {
+          document.getElementById("btnDisconnect").disabled = false;
+          document.getElementById("chatInput").disabled = false;
+          document.getElementById("btnSend").disabled = false;
+          addSystemMsg("Connected to room: " + roomName);
+          updateParticipants();
+          startStatsPolling();
+        }
+      });
+
+      // Chat messages
+      room.on(RoomEvent.ChatMessage, (msg, participant) => {
+        const name = participant ? participant.identity : "unknown";
+        const isSelf = participant && participant.identity === room.localParticipant.identity;
+        addChatMsg(name, msg.message, isSelf);
+      });
+
+      // Participant events
+      room.on(RoomEvent.ParticipantConnected, (p) => {
+        addSystemMsg(p.identity + " joined");
+        updateParticipants();
+      });
+
+      room.on(RoomEvent.ParticipantDisconnected, (p) => {
+        addSystemMsg(p.identity + " left");
+        updateParticipants();
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        resetUI();
+        addSystemMsg("Disconnected from room");
+      });
+
+      // Connect to LiveKit — ws://localhost:7880 for local dev
+      const wsUrl = "ws://" + window.location.hostname + ":7880";
+      await room.connect(wsUrl, token);
+    }
+
+    async function disconnect() {
+      if (room) {
+        await room.disconnect();
+        room = null;
+      }
+    }
+
+    async function sendChat() {
+      const input = document.getElementById("chatInput");
+      const msg = input.value.trim();
+      if (!msg || !room) return;
+
+      await room.localParticipant.sendChatMessage(msg);
+      addChatMsg(room.localParticipant.identity, msg, true);
+      input.value = "";
+    }
+
+    function addChatMsg(author, text, isSelf) {
+      const container = document.getElementById("chatMessages");
+      const div = document.createElement("div");
+      div.className = "chat-msg" + (isSelf ? " self" : "");
+      div.innerHTML = '<div class="author">' + author + "</div>" + text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addSystemMsg(text) {
+      const container = document.getElementById("chatMessages");
+      const div = document.createElement("div");
+      div.className = "chat-msg system";
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function updateParticipants() {
+      if (!room) return;
+      const container = document.getElementById("participants");
+      container.innerHTML = "";
+
+      const all = [room.localParticipant, ...room.remoteParticipants.values()];
+      document.getElementById("participantCount").textContent = all.length;
+
+      all.forEach((p) => {
+        const badge = document.createElement("span");
+        badge.className = "participant-badge";
+        badge.textContent = p.identity + (p === room.localParticipant ? " (you)" : "");
+        container.appendChild(badge);
+      });
+    }
+
+    // Poll WebRTC stats to show transport info (TCP vs UDP)
+    function startStatsPolling() {
+      if (statsInterval) clearInterval(statsInterval);
+      statsInterval = setInterval(async () => {
+        if (!room || room.state !== ConnectionState.Connected) {
+          clearInterval(statsInterval);
+          return;
+        }
+
+        try {
+          const pc = room.engine.subscriber.pc;
+          if (!pc) return;
+
+          const stats = await pc.getStats();
+          stats.forEach((report) => {
+            if (report.type === "candidate-pair" && report.state === "succeeded") {
+              // Find the local candidate to get transport protocol
+              stats.forEach((s) => {
+                if (s.type === "local-candidate" && s.id === report.localCandidateId) {
+                  const proto = (s.protocol || "").toUpperCase();
+                  const el = document.getElementById("transport");
+                  el.textContent = proto;
+                  el.className = "status-value" + (proto === "TCP" ? " tcp" : "");
+                  document.getElementById("iceType").textContent = s.candidateType || "—";
+                }
+                if (s.type === "remote-candidate" && s.id === report.remoteCandidateId) {
+                  const addr = s.address ? s.address + ":" + s.port : "—";
+                  document.getElementById("remoteAddr").textContent = addr;
+                }
+              });
+            }
+          });
+        } catch (e) {
+          // stats not available yet
+        }
+      }, 2000);
+    }
+
+    function resetUI() {
+      if (statsInterval) clearInterval(statsInterval);
+      document.getElementById("btnConnect").disabled = false;
+      document.getElementById("btnDisconnect").disabled = true;
+      document.getElementById("chatInput").disabled = true;
+      document.getElementById("btnSend").disabled = true;
+      document.getElementById("connState").textContent = "Disconnected";
+      document.getElementById("connState").className = "status-value disconnected";
+      document.getElementById("transport").textContent = "—";
+      document.getElementById("iceType").textContent = "—";
+      document.getElementById("remoteAddr").textContent = "—";
+      document.getElementById("participantCount").textContent = "0";
+      document.getElementById("participants").innerHTML = "";
+    }
+  </script>
+</body>
+</html>

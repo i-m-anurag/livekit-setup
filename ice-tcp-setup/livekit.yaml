@@ -19,7 +19,6 @@
 # =============================================================================
 
 port: 7880
-bind: 0.0.0.0
 log_level: info
 
 # -----------------------------------------------------------------------------
@@ -29,9 +28,13 @@ rtc:
   # The single TCP port that replaces all UDP media traffic
   tcp_port: 7881
 
-  # Disable UDP entirely (collapse the range)
-  port_range_start: 50000
-  port_range_end: 50000
+  # Disable UDP entirely — no UDP candidates will be generated
+  port_range_start: 0
+  port_range_end: 0
+
+  # Advertise 127.0.0.1 in ICE candidates (not Docker internal IP)
+  # On a real server, set this to the server's LAN/public IP
+  node_ip: 127.0.0.1
 
   # Private infra — no need to discover public IP via external STUN
   use_external_ip: false
