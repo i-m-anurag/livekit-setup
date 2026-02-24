@@ -125,7 +125,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ room: roomName, identity }),
       });
-      const { token } = await res.json();
+      const { token, wsUrl } = await res.json();
 
       // Create room and connect
       room = new Room();
@@ -169,8 +169,7 @@
         addSystemMsg("Disconnected from room");
       });
 
-      // Connect to LiveKit — ws://localhost:7880 for local dev
-      const wsUrl = "ws://" + window.location.hostname + ":7880";
+      // Connect to LiveKit using URL from server
       await room.connect(wsUrl, token);
     }
 
