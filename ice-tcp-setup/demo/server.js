@@ -2,7 +2,10 @@ const express = require("express");
 const path = require("path");
 const { AccessToken } = require("livekit-server-sdk");
 
+const cors = require("cors");
+
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Must match keys in livekit.yaml
