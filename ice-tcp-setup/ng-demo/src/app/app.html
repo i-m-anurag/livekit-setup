@@ -1,0 +1,76 @@
+<div class="container">
+  <h1>LiveKit Voice Call Demo</h1>
+  <p class="subtitle">Audio over ICE/TCP</p>
+
+  <!-- Join Form -->
+  @if (isDisconnected()) {
+    <div class="join-form">
+      <input type="text" [(ngModel)]="roomName" placeholder="Room name" />
+      <input type="text" [(ngModel)]="identity" placeholder="Your name" />
+      <button class="btn btn-connect" (click)="connect()" [disabled]="connecting">
+        {{ connecting ? 'Joining...' : 'Join Room' }}
+      </button>
+    </div>
+  }
+
+  <!-- Connected UI -->
+  @if (isConnected()) {
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-mute" [class.muted]="isMuted()" (click)="toggleMute()">
+        {{ isMuted() ? 'Unmute' : 'Mute' }}
+      </button>
+      <button class="btn btn-disconnect" (click)="disconnect()">Leave Room</button>
+    </div>
+
+    <!-- Participants -->
+    <div class="participants-grid">
+      @for (p of participants(); track p.identity) {
+        <div class="participant-card" [class.speaking]="p.isSpeaking">
+          <div class="avatar">{{ p.identity.charAt(0).toUpperCase() }}</div>
+          <div class="name">{{ p.identity }}{{ p.isSelf ? ' (you)' : '' }}</div>
+          <div class="audio-status" [class.muted]="!p.audioEnabled">
+            {{ p.audioEnabled ? 'Audio On' : 'Muted' }}
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Status -->
+    <div class="status-panel">
+      <div class="status-row">
+        <span class="label">Transport</span>
+        <span class="value transport">{{ transport() }}</span>
+      </div>
+      <div class="status-row">
+        <span class="label">Participants</span>
+        <span class="value">{{ participantCount() }}</span>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat-panel">
+      <div class="chat-messages" #chatContainer>
+        @for (msg of messages(); track $index) {
+          @if (msg.isSystem) {
+            <div class="msg system">{{ msg.text }}</div>
+          } @else {
+            <div class="msg" [class.self]="msg.isSelf">
+              <span class="author">{{ msg.identity }}</span>
+              {{ msg.text }}
+            </div>
+          }
+        }
+      </div>
+      <div class="chat-input">
+        <input
+          type="text"
+          [(ngModel)]="chatText"
+          placeholder="Type a message..."
+          (keydown.enter)="sendChat()"
+        />
+        <button class="btn btn-send" (click)="sendChat()">Send</button>
+      </div>
+    </div>
+  }
+</div>

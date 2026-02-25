@@ -13,8 +13,8 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "APIKeyChangeMe";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "APISecretChangeMe";
 
 // LiveKit WebSocket URL
-// Local dev:  ws://localhost:7880
-// Production: wss://livekit.example.com (behind Nginx/Caddy with TLS)
+// Local dev:  ws://localhost:7880  (direct to LiveKit)
+// Production: wss://demo.yourdomain.com  (same domain, Nginx proxies /rtc/ to LiveKit)
 const LIVEKIT_WS_URL = process.env.LIVEKIT_WS_URL || "ws://localhost:7880";
 
 // Serve the HTML file
