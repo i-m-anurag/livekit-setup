@@ -1,0 +1,41 @@
+# =============================================================================
+# LiveKit SFU — Standard UDP Setup
+# =============================================================================
+#
+# Default WebRTC mode. Media flows over UDP on a port range.
+# Best performance (lowest latency) but requires UDP ports open in firewall.
+#
+#   7880/tcp         — Signaling (WebSocket) — proxy behind Nginx for wss://
+#   7881/tcp         — ICE/TCP fallback      — for clients where UDP fails
+#   50000-60000/udp  — ICE/UDP media         — primary media transport
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#
+# =============================================================================
+
+services:
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    ports:
+      - "7880:7880/tcp"           # Signaling (WebSocket)
+      - "7881:7881/tcp"           # ICE/TCP fallback
+      - "50000-60000:50000-60000/udp"  # ICE/UDP media
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

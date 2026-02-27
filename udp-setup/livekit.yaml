@@ -1,0 +1,90 @@
+# =============================================================================
+# LiveKit SFU — Standard UDP Setup
+# =============================================================================
+#
+# How it works:
+#   WebRTC media (audio, video, data) flows over UDP on ports 50000–60000.
+#   This is the default and highest-performance mode (lowest latency).
+#   TCP fallback on port 7881 is enabled for clients where UDP is blocked.
+#
+# Ports:
+#   7880/tcp         — WebSocket signaling (room join, token auth)
+#   7881/tcp         — ICE/TCP fallback media
+#   50000-60000/udp  — ICE/UDP media (primary)
+#
+# =============================================================================
+
+port: 7880
+log_level: info
+
+# -----------------------------------------------------------------------------
+# RTC — UDP Primary + TCP Fallback
+# -----------------------------------------------------------------------------
+rtc:
+  # UDP port range for media traffic (primary transport)
+  port_range_start: 50000
+  port_range_end: 60000
+
+  # TCP fallback port — used when UDP is blocked for a client
+  tcp_port: 7881
+
+  # IP advertised in ICE candidates
+  # Local dev:    127.0.0.1
+  # VPN access:   10.0.0.x  (server's VPN IP)
+  # Production:   <server's public/LAN IP>
+  node_ip: 127.0.0.1
+
+  # Set to true if server is behind NAT and needs to discover public IP via STUN
+  # Set to false for private infra / VPN where clients connect to LAN/VPN IP
+  use_external_ip: false
+
+  # Enable automatic TCP fallback when UDP fails
+  allow_tcp_fallback: true
+
+# -----------------------------------------------------------------------------
+# Room Settings — Best Practices (Audio Calling)
+# -----------------------------------------------------------------------------
+room:
+  # Auto-create rooms when participants join (default: true)
+  auto_create: true
+
+  # Seconds to keep room open if NO ONE joins (default: 300 = 5 min)
+  # Prevents zombie rooms from token-only creation
+  empty_timeout: 300
+
+  # Seconds to keep room open AFTER last participant leaves (default: 20)
+  # Grace period for rejoining after disconnect/refresh
+  departure_timeout: 20
+
+  # Max participants per room (1:1 audio call)
+  max_participants: 2
+
+  # Only allow Opus audio codec (no video codecs needed)
+  enabled_codecs:
+    - mime: audio/opus
+
+# -----------------------------------------------------------------------------
+# Limits — Resource Protection
+# -----------------------------------------------------------------------------
+limit:
+  # Max tracks per CPU core (default: 400)
+  num_tracks: 400
+
+  # Max metadata size in bytes per participant
+  max_metadata_size: 65536
+
+  # Max room name length
+  max_room_name_length: 256
+
+  # Max participant identity length
+  max_participant_identity_length: 256
+
+# -----------------------------------------------------------------------------
+# API Keys
+# Generate:
+#   Key:    openssl rand -hex 16
+#   Secret: openssl rand -hex 32
+# Must match what your backend uses for livekit-server-sdk token generation
+# -----------------------------------------------------------------------------
+keys:
+  APIKeyChangeMe: APISecretChangeMe
